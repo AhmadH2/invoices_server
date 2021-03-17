@@ -11,14 +11,14 @@ const paymentSchema = new mongoose.Schema({
         type: Number,
         required: true,
     },
+    paidValue: {
+        type: Number,
+        required: true,
+    },
     paymentDate: {
         type: String,
         required: false,
     },
-    isPayed: {
-        type: Boolean,
-        default: false,
-    }
 
 })
 

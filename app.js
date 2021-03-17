@@ -54,7 +54,7 @@ app.post('/invoices', async (req, res) => {
         customerName: req.body.customerName,
         descr: req.body.descr,
         value: req.body.value,
-        creationDate: req.body.creationDate,
+        creationDate: Date.now().toString(),
     })
 
     try {
@@ -78,6 +78,7 @@ app.post('/payments', async (req, res) => {
     const payment = new Payment({
         invoiceId: req.body.invoiceId,
         value: req.body.value,
+        paidValue: req.body.paidValue,
         paymentDate: req.body.paymentDate,
     })
 
@@ -88,6 +89,87 @@ app.post('/payments', async (req, res) => {
         res.send('Error' + err)
     }
 })
+
+app.get('/payments/:id', async (req, res) => {
+    try {
+        const payment = await Payment.find({ invoiceId: req.params.id });
+        res.json(payment)
+    } catch (err) {
+        res.send('Error ' + err)
+    }
+})
+
+app.put('/payments/:id', async (req, res) => {
+
+    try {
+        const pay = await Payment.findById(req.params.id);
+        let oldValue = pay.value;
+        let newValue = req.body.value;
+        let changeInValue = newValue - oldValue;
+        const payments = await Payment.find({ invoiceId: pay.invoiceId });
+
+        if (newValue > oldValue) {
+            let i = 1;
+            while (changeInValue !== 0) {
+                let lastPay = payments[payments.length - i];
+                if (lastPay.value > changeInValue) {
+                    await Payment.findByIdAndUpdate(lastPay.id, {
+                        "value": lastPay.value - changeInValue,
+                    });
+                    changeInValue = 0;
+                }
+                else {
+                    changeInValue -= lastPay.value;
+                    await Payment.findByIdAndDelete(lastPay.id);
+                }
+                i++;
+            }   
+        }
+        
+        if(oldValue > newValue) {
+            let lastPay = payments[payments.length - 1];
+            if (pay.id === lastPay.id) {
+                const payment = new Payment({
+                    invoiceId: lastPay.invoiceId,
+                    value: Math.abs(changeInValue),
+                    paidValue: 0,
+                    paymentDate: lastPay.paymentDate,
+                });
+                try {
+                    const pay = await payment.save()
+                    res.json(pay)
+                } catch (err) {
+                    res.send('Error' + err)
+                }
+                
+            }
+            await Payment.findByIdAndUpdate(lastPay.id, {
+                "value": lastPay.value - changeInValue,
+            });
+        }
+        
+        await Payment.findByIdAndUpdate(req.params.id, {
+            "value": req.body.value,
+            "paidValue": req.body.paidValue,
+            "paymentDate": req.body.paymentDate
+        });
+        res.json({ "done": "true" })
+    } catch (err) {
+        res.send('Error' + err)
+    }
+})
+
+app.delete('/payments/:id', async (req, res) => {
+    try {
+        var pay = await Payment.findByIdAndRemove(req.params.id);
+        pay = req.body;
+        res.json({ "done": "true" })
+    } catch (err) {
+        res.send('Error' + err)
+    }
+})
+
+
 app.listen(900, ()=> {
     console.log('server started on port 9000');
 })
